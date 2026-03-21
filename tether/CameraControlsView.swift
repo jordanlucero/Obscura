@@ -59,6 +59,5 @@ struct CameraControlsView: View {
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
-        .background(.ultraThinMaterial)
     }
 }

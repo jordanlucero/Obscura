@@ -24,7 +24,13 @@ No test infrastructure exists yet.
 Canon EOS cameras communicate over USB using PTP (Picture Transfer Protocol) with Canon vendor extensions. Apple's ImageCaptureCore framework provides device discovery and raw PTP command passthrough on iPadOS/macOS.
 
 ```
-SwiftUI Views (ContentView, LiveViewDisplay, CameraControlsView)
+SwiftUI Views
+  ContentView ─── GeometryReader + ZStack layout
+    │  ├── liveViewLayer (full-bleed: play button / pulsing camera / LiveViewDisplay + stop overlay)
+    │  └── floatingControls (draggable .glassEffect() panel: drag handle + CameraControlsView + status)
+    │
+    ├── LiveViewDisplay ─── shows CGImage or ContentUnavailableView (platform-aware USB text)
+    └── CameraControlsView ─── ISO picker, shutter button, Tv picker (no own background)
        │
   CameraManager (@Observable — discovery, connection, state)
        │
@@ -33,11 +39,30 @@ SwiftUI Views (ContentView, LiveViewDisplay, CameraControlsView)
   ICDeviceBrowser / ICCameraDevice (Apple's ImageCaptureCore)
 ```
 
-**CameraManager** — Central state manager. Owns the `ICDeviceBrowser`, handles device discovery (filters for Canon USB vendor ID `0x04A9`), manages connection lifecycle, and drives the UI via `@Observable`. Delegates are `nonisolated` with `Task { @MainActor in }` dispatch for Swift 6 concurrency.
+**CameraManager** — Central state manager. Owns the `ICDeviceBrowser`, handles device discovery (filters for Canon USB vendor ID `0x04A9`), manages connection lifecycle, and drives the UI via `@Observable`. Delegates are `nonisolated` with `Task { @MainActor in }` dispatch for Swift 6 concurrency. Has a `#if DEBUG` preview factory (`CameraManager.preview(state:cameraName:isLiveViewActive:)`) for SwiftUI previews.
 
 **CanonPTPService** — Builds PTP command containers (12-byte header: length + type + opcode + transaction ID, all little-endian), sends them via `requestSendPTPCommand`, and parses responses. The completion handler returns data-in payload as the *first* parameter and PTP response container as the *second* — this is counterintuitive and was discovered empirically.
 
-**CanonPTPConstants** — Single source of truth for Canon PTP operation codes, property codes, ISO/shutter speed value mappings (APEX-based hex codes), and `Data` extension helpers for little-endian serialization.
+**CanonPTPConstants** — Single source of truth for Canon PTP operation codes, property codes, ISO/shutter speed value mappings (APEX-based hex codes), `Data` extension helpers for little-endian serialization, and the `ConnectionState` enum.
+
+## UI / Interaction Design
+
+**Layout**: Full-bleed live view with a floating controls panel overlaid via `ZStack`. No top bar — status info lives inside the floating panel.
+
+**Live view states** (in `ContentView.liveViewLayer`):
+1. **No camera** → `LiveViewDisplay` shows `ContentUnavailableView` with platform-specific USB text (Mac/iPhone/iPad/Vision Pro, via `#if os()` + `UIDevice.current.userInterfaceIdiom`)
+2. **Connected, live view off** → large `play.fill` button in `.glassEffect()`
+3. **Live view warming up** (active but no frames yet) → pulsing `camera.fill` symbol (`.symbolEffect(.pulse)`)
+4. **Live view streaming** → `LiveViewDisplay` with a `stop.fill` glass button overlaid top-right
+
+**Floating controls panel** (`ContentView.floatingControls`):
+- Wrapped in `.glassEffect()` (liquid glass). `CameraControlsView` has no background of its own.
+- Drag handle capsule at top as visual affordance
+- Draggable via `DragGesture(minimumDistance: 10)` — works with touch, trackpad, and mouse
+- Position stored as absolute `CGPoint?` (defaults to bottom-center via `GeometryReader`), clamped to 60pt from edges on release with spring animation
+- `minimumDistance: 10` prevents stealing taps from buttons/menus inside the panel
+
+**SwiftUI previews**: `ContentView` has an injectable `init(cameraManager:)` and three named previews: "No Camera", "Connected — Live View Off", "Live View Warming Up". Uses `CameraManager.preview(state:cameraName:isLiveViewActive:)` factory (DEBUG only).
 
 ## Canon PTP Protocol Details
 
