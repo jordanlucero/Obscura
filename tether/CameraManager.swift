@@ -15,6 +15,11 @@ class CameraManager: NSObject {
     var isLiveViewActive: Bool = false
     var errorMessage: String?
 
+    /// Available ISO values reported by the connected camera.
+    var availableISOs: [ISOValue] = ISOValue.all
+    /// Available shutter speed values reported by the connected camera.
+    var availableShutterSpeeds: [ShutterSpeedValue] = ShutterSpeedValue.all
+
     // MARK: - Internal
 
     @ObservationIgnored private var browser: ICDeviceBrowser?
@@ -22,7 +27,6 @@ class CameraManager: NSObject {
     @ObservationIgnored private var ptpService: CanonPTPService?
     @ObservationIgnored private var liveViewTask: Task<Void, Never>?
 
-    // Canon USB vendor ID
     private static let canonVendorID = 0x04A9
 
     // MARK: - Browsing
@@ -68,13 +72,8 @@ class CameraManager: NSObject {
         Task {
             do {
                 try await ptpService.setISO(iso.code)
-                // Poll events to confirm the camera accepted the change
-                let props = try await ptpService.pollEvents()
-                if let newISO = props[CanonProperty.iso.rawValue] {
-                    self.currentISO = ISOValue.name(for: newISO)
-                } else {
-                    self.currentISO = iso.name
-                }
+                let events = try await ptpService.pollEvents()
+                applyEventResults(events)
             } catch {
                 self.errorMessage = "Set ISO failed: \(error.localizedDescription)"
             }
@@ -86,12 +85,8 @@ class CameraManager: NSObject {
         Task {
             do {
                 try await ptpService.setShutterSpeed(speed.code)
-                let props = try await ptpService.pollEvents()
-                if let newTv = props[CanonProperty.shutterSpeed.rawValue] {
-                    self.currentShutterSpeed = ShutterSpeedValue.name(for: newTv)
-                } else {
-                    self.currentShutterSpeed = speed.name
-                }
+                let events = try await ptpService.pollEvents()
+                applyEventResults(events)
             } catch {
                 self.errorMessage = "Set shutter speed failed: \(error.localizedDescription)"
             }
@@ -136,25 +131,51 @@ class CameraManager: NSObject {
         liveViewImage = nil
     }
 
-    // MARK: - Session Setup
+    // MARK: - Authorization & Session Setup
+
+    /// Requests control authorization (required on iPadOS for PTP commands).
+    /// On macOS this is not needed — returns true immediately.
+    private func requestControlAuthorizationIfNeeded() async -> Bool {
+        #if os(iOS) || os(visionOS)
+        guard let browser else { return false }
+
+        let status = browser.controlAuthorizationStatus
+        print("[Camera] Current control authorization: \(status.rawValue)")
+
+        if status == .authorized { return true }
+
+        let newStatus = await withCheckedContinuation { continuation in
+            browser.requestControlAuthorization { s in
+                continuation.resume(returning: s)
+            }
+        }
+        print("[Camera] Control authorization result: \(newStatus.rawValue)")
+        return newStatus == .authorized
+        #else
+        return true
+        #endif
+    }
 
     private func initializeRemoteControl(device: ICCameraDevice) {
         let service = CanonPTPService(device: device)
         ptpService = service
 
         Task {
+            // Request control authorization (critical on iPadOS, no-op on macOS if already authorized)
+            let authorized = await requestControlAuthorizationIfNeeded()
+            if !authorized {
+                self.connectionState = .error
+                self.errorMessage = "Camera control not authorized. Check Settings > Privacy."
+                print("[Camera] Control authorization denied.")
+                return
+            }
+
             do {
                 try await service.enableRemoteMode()
 
-                // Canon EOS reports current property values as events after SetEventMode(1).
-                // Poll to read the initial state.
-                let props = try await service.pollEvents()
-                if let iso = props[CanonProperty.iso.rawValue] {
-                    self.currentISO = ISOValue.name(for: iso)
-                }
-                if let tv = props[CanonProperty.shutterSpeed.rawValue] {
-                    self.currentShutterSpeed = ShutterSpeedValue.name(for: tv)
-                }
+                // Canon EOS reports current values and available values as events
+                let events = try await service.pollEvents()
+                applyEventResults(events)
 
                 self.connectionState = .connected
                 print("[Camera] Fully connected — ISO=\(self.currentISO) Tv=\(self.currentShutterSpeed)")
@@ -166,12 +187,37 @@ class CameraManager: NSObject {
         }
     }
 
+    // MARK: - Event Handling
+
+    private func applyEventResults(_ events: EventPollResult) {
+        // Update current values
+        if let iso = events.currentValues[CanonProperty.iso.rawValue] {
+            currentISO = ISOValue.name(for: iso)
+        }
+        if let tv = events.currentValues[CanonProperty.shutterSpeed.rawValue] {
+            currentShutterSpeed = ShutterSpeedValue.name(for: tv)
+        }
+
+        // Update available value lists (filter our static table to only camera-supported values)
+        if let isoList = events.availableValues[CanonProperty.iso.rawValue], !isoList.isEmpty {
+            availableISOs = isoList.compactMap { code in
+                ISOValue.all.first { $0.code == code }
+            }
+            print("[Camera] Available ISOs: \(availableISOs.map(\.name).joined(separator: ", "))")
+        }
+        if let tvList = events.availableValues[CanonProperty.shutterSpeed.rawValue], !tvList.isEmpty {
+            availableShutterSpeeds = tvList.compactMap { code in
+                ShutterSpeedValue.all.first { $0.code == code }
+            }
+            print("[Camera] Available Tv: \(availableShutterSpeeds.map(\.name).joined(separator: ", "))")
+        }
+    }
+
     // MARK: - JPEG Extraction
 
     private func extractJPEG(from data: Data) -> CGImage? {
         guard data.count > 2 else { return nil }
 
-        // Scan for JPEG SOI marker (0xFF 0xD8)
         var soiOffset: Int?
         for i in 0..<(data.count - 1) {
             if data[data.startIndex + i] == 0xFF && data[data.startIndex + i + 1] == 0xD8 {
@@ -181,11 +227,10 @@ class CameraManager: NSObject {
         }
         guard let soi = soiOffset else { return nil }
 
-        // Scan for JPEG EOI marker (0xFF 0xD9) from SOI
         var eoiOffset: Int?
         for i in (soi + 2)..<(data.count - 1) {
             if data[data.startIndex + i] == 0xFF && data[data.startIndex + i + 1] == 0xD9 {
-                eoiOffset = i + 2 // include the EOI marker
+                eoiOffset = i + 2
                 break
             }
         }
@@ -200,13 +245,33 @@ class CameraManager: NSObject {
     }
 }
 
+// MARK: - Preview Support
+
+#if DEBUG
+extension CameraManager {
+    static func preview(
+        state: ConnectionState,
+        cameraName: String = "Canon EOS R5",
+        isLiveViewActive: Bool = false
+    ) -> CameraManager {
+        let m = CameraManager()
+        m.connectionState = state
+        m.cameraName = cameraName
+        m.isLiveViewActive = isLiveViewActive
+        m.currentISO = "400"
+        m.currentShutterSpeed = "1/125"
+        return m
+    }
+}
+#endif
+
 // MARK: - ICDeviceBrowserDelegate
 
 extension CameraManager: ICDeviceBrowserDelegate {
     nonisolated func deviceBrowser(_ browser: ICDeviceBrowser, didAdd device: ICDevice, moreComing: Bool) {
         let name = device.name ?? "unknown"
         let vendorID = device.usbVendorID
-        print("[Camera] Browser found device: \(name) (vendorID=0x\(String(vendorID, radix: 16)), type=\(device.type), moreComing=\(moreComing))")
+        print("[Camera] Browser found device: \(name) (vendorID=0x\(String(vendorID, radix: 16)), moreComing=\(moreComing))")
         Task { @MainActor in
             self.handleDeviceAdded(device)
         }
@@ -220,7 +285,6 @@ extension CameraManager: ICDeviceBrowserDelegate {
     }
 
     private func handleDeviceAdded(_ device: ICDevice) {
-        // Only accept Canon cameras connected via USB
         guard let camera = device as? ICCameraDevice,
               camera.usbVendorID == Self.canonVendorID else {
             print("[Camera] Ignoring non-Canon device: \(device.name ?? "unknown")")
@@ -244,6 +308,8 @@ extension CameraManager: ICDeviceBrowserDelegate {
         cameraName = ""
         currentISO = "---"
         currentShutterSpeed = "---"
+        availableISOs = ISOValue.all
+        availableShutterSpeeds = ShutterSpeedValue.all
     }
 }
 
@@ -260,7 +326,6 @@ extension CameraManager: ICCameraDeviceDelegate {
             }
             if let camera = device as? ICCameraDevice {
                 self.connectedDevice = camera
-                // Don't send PTP commands yet — wait for deviceDidBecomeReady
                 print("[Camera] Session opened. Waiting for device to become ready...")
             }
         }

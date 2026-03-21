@@ -15,6 +15,24 @@ private final class OnceFlag: @unchecked Sendable {
     }
 }
 
+// MARK: - Event Poll Result
+
+struct EventPollResult: Sendable {
+    /// Property code → current value
+    var currentValues: [UInt32: UInt32] = [:]
+    /// Property code → list of valid/available values
+    var availableValues: [UInt32: [UInt32]] = [:]
+}
+
+// MARK: - Canon Event Types
+
+private enum CanonEventType {
+    static let propValueChanged: UInt32  = 0xC189
+    static let availListChanged: UInt32  = 0xC18A
+}
+
+// MARK: - PTP Service
+
 class CanonPTPService {
     private let device: ICCameraDevice
     private var transactionID: UInt32 = 0
@@ -26,12 +44,12 @@ class CanonPTPService {
     // MARK: - PTP Command Building
 
     private func buildPTPCommand(operation: CanonPTPOperation, parameters: [UInt32] = []) -> Data {
-        let headerSize = 12 // length(4) + type(2) + code(2) + transactionID(4)
+        let headerSize = 12
         let totalSize = headerSize + parameters.count * 4
 
         var data = Data(capacity: totalSize)
         data.appendLittleEndian(UInt32(totalSize))
-        data.appendLittleEndian(UInt16(0x0001)) // Command block type
+        data.appendLittleEndian(UInt16(0x0001))
         data.appendLittleEndian(operation.rawValue)
         transactionID += 1
         data.appendLittleEndian(transactionID)
@@ -87,7 +105,7 @@ class CanonPTPService {
             }
         }
 
-        // Validate PTP response code from the response container (second param)
+        // Validate PTP response code from the response container
         if ptpResponse.count >= 8 {
             let responseCode: UInt16 = ptpResponse.readLittleEndian(at: 6)
             if responseCode != PTPResponseCode.ok {
@@ -98,15 +116,12 @@ class CanonPTPService {
 
         // Return data-in payload if available
         if !dataInPayload.isEmpty {
-            print("[PTP] payload: \(hexDump(dataInPayload))")
             return dataInPayload
         }
 
-        // For commands without data-in phase, return any response parameters (after 12-byte header)
+        // Otherwise return response parameters (after 12-byte header)
         if ptpResponse.count > 12 {
-            let params = Data(ptpResponse[ptpResponse.startIndex + 12 ..< ptpResponse.endIndex])
-            print("[PTP] response params: \(hexDump(params))")
-            return params
+            return Data(ptpResponse[ptpResponse.startIndex + 12 ..< ptpResponse.endIndex])
         }
 
         return Data()
@@ -139,52 +154,80 @@ class CanonPTPService {
     /// Canon format: no PTP command params; data-out = [totalSize][propCode][value]
     func setProperty(_ property: CanonProperty, value: UInt32) async throws {
         var outData = Data(capacity: 12)
-        outData.appendLittleEndian(UInt32(12))        // total size including this field
-        outData.appendLittleEndian(property.rawValue)  // property code
-        outData.appendLittleEndian(value)              // property value
+        outData.appendLittleEndian(UInt32(12))
+        outData.appendLittleEndian(property.rawValue)
+        outData.appendLittleEndian(value)
 
         _ = try await sendCommand(
             operation: .setDevicePropValueEx,
-            parameters: [],  // No command parameters for Canon EOS
+            parameters: [],
             outData: outData
         )
     }
 
-    /// Polls the camera for pending events, returns property code → value pairs.
-    /// Canon EOS cameras report current property values via events after SetEventMode(1).
-    func pollEvents() async throws -> [UInt32: UInt32] {
+    // MARK: - Events
+
+    /// Polls the camera for pending events. Returns current property values
+    /// and lists of available/valid values for each property.
+    func pollEvents() async throws -> EventPollResult {
         let data = try await sendCommand(operation: .getEvent)
         return parseEventRecords(data)
     }
 
-    private func parseEventRecords(_ data: Data) -> [UInt32: UInt32] {
-        var properties: [UInt32: UInt32] = [:]
+    private func parseEventRecords(_ data: Data) -> EventPollResult {
+        var result = EventPollResult()
         var offset = 0
 
         while offset + 8 <= data.count {
             let recordSize: UInt32 = data.readLittleEndian(at: offset)
+            let eventType: UInt32 = data.readLittleEndian(at: offset + 4)
+
+            // End marker: size=8, type=0
+            if recordSize == 8 && eventType == 0 { break }
             guard recordSize >= 8, offset + Int(recordSize) <= data.count else { break }
 
-            let recordType: UInt32 = data.readLittleEndian(at: offset + 4)
+            switch eventType {
+            case CanonEventType.propValueChanged:
+                // [size=16][type=0xC189][propCode][currentValue]
+                if recordSize >= 16 {
+                    let propCode: UInt32 = data.readLittleEndian(at: offset + 8)
+                    let value: UInt32 = data.readLittleEndian(at: offset + 12)
+                    result.currentValues[propCode] = value
+                }
 
-            // Property change records: type is the property code (0xD1xx range)
-            if recordSize >= 12 {
-                let value: UInt32 = data.readLittleEndian(at: offset + 8)
-                properties[recordType] = value
+            case CanonEventType.availListChanged:
+                // [size][type=0xC18A][propCode][dataType][count][val0][val1]...
+                if recordSize >= 20 {
+                    let propCode: UInt32 = data.readLittleEndian(at: offset + 8)
+                    let count: UInt32 = data.readLittleEndian(at: offset + 16)
+                    var values: [UInt32] = []
+                    for i in 0..<Int(count) {
+                        let valOffset = offset + 20 + i * 4
+                        guard valOffset + 4 <= offset + Int(recordSize) else { break }
+                        let val: UInt32 = data.readLittleEndian(at: valOffset)
+                        values.append(val)
+                    }
+                    result.availableValues[propCode] = values
+                }
+
+            default:
+                break
             }
 
             offset += Int(recordSize)
-            // Align to 4-byte boundary
             if offset % 4 != 0 {
                 offset += 4 - (offset % 4)
             }
         }
 
-        if !properties.isEmpty {
-            print("[PTP] Events parsed: \(properties.map { "0x\(String($0.key, radix: 16))=0x\(String($0.value, radix: 16))" }.joined(separator: ", "))")
+        if !result.currentValues.isEmpty {
+            print("[PTP] Event values: \(result.currentValues.map { "0x\(String($0.key, radix: 16))=0x\(String($0.value, radix: 16))" }.joined(separator: ", "))")
+        }
+        if !result.availableValues.isEmpty {
+            print("[PTP] Available lists: \(result.availableValues.map { "0x\(String($0.key, radix: 16)): \($0.value.count) options" }.joined(separator: ", "))")
         }
 
-        return properties
+        return result
     }
 
     // MARK: - ISO

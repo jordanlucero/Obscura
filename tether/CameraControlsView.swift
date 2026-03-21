@@ -5,9 +5,9 @@ struct CameraControlsView: View {
 
     var body: some View {
         HStack(spacing: 32) {
-            // ISO Picker
+            // ISO Picker — shows only camera-supported values
             Menu {
-                ForEach(ISOValue.all) { iso in
+                ForEach(manager.availableISOs) { iso in
                     Button(iso.name) {
                         manager.setISO(iso)
                     }
@@ -39,9 +39,9 @@ struct CameraControlsView: View {
             .buttonStyle(.plain)
             .disabled(manager.connectionState != .connected)
 
-            // Shutter Speed Picker
+            // Shutter Speed Picker — shows only camera-supported values
             Menu {
-                ForEach(ShutterSpeedValue.all) { speed in
+                ForEach(manager.availableShutterSpeeds) { speed in
                     Button(speed.name) {
                         manager.setShutterSpeed(speed)
                     }
