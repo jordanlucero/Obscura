@@ -32,7 +32,7 @@ struct CameraControlsView: View {
                         .strokeBorder(.white, lineWidth: 3)
                         .frame(width: 72, height: 72)
                     Circle()
-                        .fill(.red)
+                        .fill(.white)
                         .frame(width: 60, height: 60)
                 }
             }

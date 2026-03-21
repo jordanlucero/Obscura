@@ -163,7 +163,7 @@ struct ContentView: View {
                             .foregroundStyle(.white)
                             .opacity(isHoveringLive ? 1 : 0)
                     }
-                    Text("LIVE")
+                    Text("LIVE VIEW")
                         .font(.footnote.monospaced().bold())
                 }
                 .padding(.horizontal, 14)
