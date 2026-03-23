@@ -5,8 +5,8 @@ struct ContentView: View {
     @State private var controlsPosition: CGPoint?
     @State private var dragOffset: CGSize = .zero
 
-    #if os(macOS)
     @State private var onAirPulse = false
+    #if os(macOS)
     @State private var isHoveringLive = false
     #else
     @State private var showingStopOverlay = false
@@ -63,8 +63,8 @@ struct ContentView: View {
                 cameraManager.startLiveView()
             } label: {
                 Image(systemName: "play.fill")
-                    .font(.system(size: 72))
-                    .padding()
+                    .font(.system(size: 44))
+                    .padding(20)
             }
             .buttonStyle(.plain)
             .glassEffect()
@@ -90,7 +90,7 @@ struct ContentView: View {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.25)) {
+                    withAnimation(.easeInOut(duration: 0.1)) {
                         showingStopOverlay.toggle()
                     }
                 }
@@ -104,7 +104,7 @@ struct ContentView: View {
                 // Stop button
                 Button {
                     cameraManager.stopLiveView()
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.easeInOut(duration: 0.8)) {
                         showingStopOverlay = false
                     }
                 } label: {
@@ -135,7 +135,7 @@ struct ContentView: View {
             Capsule()
                 .fill(.secondary.opacity(0.5))
                 .frame(width: 36, height: 5)
-                .padding(.top, 10)
+                .padding(.top, 6)
                 .padding(.bottom, 6)
 
             CameraControlsView(manager: cameraManager)
@@ -157,20 +157,20 @@ struct ContentView: View {
                     ZStack {
                         Circle()
                             .fill(.red)
-                            .frame(width: 10, height: 10)
+                            .frame(width: 12, height: 12)
                         Image(systemName: "stop.fill")
-                            .font(.system(size: 5, weight: .bold))
+                            .font(.system(size: 8))
                             .foregroundStyle(.white)
                             .opacity(isHoveringLive ? 1 : 0)
                     }
                     Text("LIVE VIEW")
-                        .font(.footnote.monospaced().bold())
+                        .font(.footnote.monospaced())
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 5)
             }
             .buttonStyle(.plain)
-            .background(.red.opacity(onAirPulse ? 0.15 : 0.0), in: Capsule())
+            .background(.red.opacity(onAirPulse ? 0.1 : 0.0), in: Capsule())
             .glassEffect()
             .onHover { hovering in
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -190,7 +190,29 @@ struct ContentView: View {
             statusLine
         }
         #else
-        statusLine
+        if cameraManager.isLiveViewActive {
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(.red)
+                    .frame(width: 12, height: 12)
+                Text("LIVE VIEW")
+                    .font(.footnote.monospaced())
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 5)
+            .background(.red.opacity(onAirPulse ? 0.1 : 0.0), in: Capsule())
+            .glassEffect()
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                    onAirPulse = true
+                }
+            }
+            .onDisappear {
+                onAirPulse = false
+            }
+        } else {
+            statusLine
+        }
         #endif
     }
 
@@ -261,10 +283,6 @@ struct ContentView: View {
 
 #Preview("No Camera") {
     ContentView()
-}
-
-#Preview("Connected — Live View Off") {
-    ContentView(cameraManager: .preview(state: .connected))
 }
 
 #Preview("Live View Warming Up") {
