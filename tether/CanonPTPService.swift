@@ -174,9 +174,32 @@ class CanonPTPService {
         return parseEventRecords(data)
     }
 
+    /// Scans forward from `badOffset` (4-byte aligned) looking for the next plausible Canon event
+    /// record header. Tries backing up 4 bytes first, since that is the most common misalignment.
+    private func resyncEventOffset(in data: Data, after badOffset: Int) -> Int? {
+        // Start one step before the bad offset so we catch the "4-byte over-advance" case.
+        let searchFrom = max(0, badOffset - 4)
+        var pos = searchFrom
+        while pos + 8 <= data.count {
+            guard pos != badOffset else { pos += 4; continue }
+            let size: UInt32 = data.readLittleEndian(at: pos)
+            let type: UInt32 = data.readLittleEndian(at: pos + 4)
+            if size >= 8, pos + Int(size) <= data.count,
+               type == CanonEventType.propValueChanged ||
+               type == CanonEventType.availListChanged ||
+               (size == 8 && type == 0) {
+                return pos
+            }
+            pos += 4
+        }
+        return nil
+    }
+
     private func parseEventRecords(_ data: Data) -> EventPollResult {
         var result = EventPollResult()
         var offset = 0
+
+        print("[PTP] parseEventRecords: \(data.count)B — \(data.prefix(32).map { String(format: "%02X", $0) }.joined(separator: " "))\(data.count > 32 ? "…" : "")")
 
         while offset + 8 <= data.count {
             let recordSize: UInt32 = data.readLittleEndian(at: offset)
@@ -184,7 +207,15 @@ class CanonPTPService {
 
             // End marker: size=8, type=0
             if recordSize == 8 && eventType == 0 { break }
-            guard recordSize >= 8, offset + Int(recordSize) <= data.count else { break }
+            guard recordSize >= 8, offset + Int(recordSize) <= data.count else {
+                if let next = resyncEventOffset(in: data, after: offset) {
+                    print("[PTP] Bad record at \(offset) (size=\(recordSize)) — resynced to \(next)")
+                    offset = next
+                    continue
+                }
+                print("[PTP] Bad record at offset \(offset): size=\(recordSize) data.count=\(data.count) — could not resync")
+                break
+            }
 
             switch eventType {
             case CanonEventType.propValueChanged:
@@ -197,21 +228,49 @@ class CanonPTPService {
 
             case CanonEventType.availListChanged:
                 // [size][type=0xC18A][propCode][dataType][count][val0][val1]...
-                if recordSize >= 20 {
+                if recordSize >= 16 {
                     let propCode: UInt32 = data.readLittleEndian(at: offset + 8)
-                    let count: UInt32 = data.readLittleEndian(at: offset + 16)
+
+                    // Read a 4-byte field at offset+12 — interpret as dataType if present (recordSize ≥ 20),
+                    // otherwise treat it as the count directly (some Canon bodies omit dataType).
+                    let (count, valuesBase): (UInt32, Int)
+                    if recordSize >= 20 {
+                        let dataType: UInt32 = data.readLittleEndian(at: offset + 12)
+                        let countCandidate: UInt32 = data.readLittleEndian(at: offset + 16)
+                        // Sanity-check: if the "count" field is implausibly large relative to
+                        // recordSize, the dataType field is probably absent — retry at offset+12.
+                        let expectedSizeWithDataType = 20 + Int(countCandidate) * 4
+                        let expectedSizeWithout    = 16 + Int(dataType) * 4
+                        if Int(recordSize) == expectedSizeWithDataType {
+                            count = countCandidate
+                            valuesBase = offset + 20
+                        } else if Int(recordSize) == expectedSizeWithout {
+                            // Camera omits dataType field
+                            count = dataType
+                            valuesBase = offset + 16
+                        } else {
+                            // Fall back to the canonical layout
+                            count = countCandidate
+                            valuesBase = offset + 20
+                        }
+                    } else {
+                        count = data.readLittleEndian(at: offset + 12)
+                        valuesBase = offset + 16
+                    }
+
                     var values: [UInt32] = []
                     for i in 0..<Int(count) {
-                        let valOffset = offset + 20 + i * 4
+                        let valOffset = valuesBase + i * 4
                         guard valOffset + 4 <= offset + Int(recordSize) else { break }
                         let val: UInt32 = data.readLittleEndian(at: valOffset)
                         values.append(val)
                     }
+                    print("[PTP] 0xC18A prop=0x\(String(propCode, radix: 16)) count=\(count) values=[\(values.prefix(8).map { "0x\(String($0, radix: 16))" }.joined(separator: ","))\(values.count > 8 ? ",…" : "")]")
                     result.availableValues[propCode] = values
                 }
 
             default:
-                break
+                print("[PTP] Unknown event 0x\(String(eventType, radix: 16)) size=\(recordSize) at offset \(offset)")
             }
 
             offset += Int(recordSize)

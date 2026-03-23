@@ -68,6 +68,7 @@ class CameraManager: NSObject {
     }
 
     func setISO(_ iso: ISOValue) {
+        currentISO = iso.name           // optimistic — camera confirmation follows
         guard let ptpService else { return }
         Task {
             do {
@@ -81,6 +82,7 @@ class CameraManager: NSObject {
     }
 
     func setShutterSpeed(_ speed: ShutterSpeedValue) {
+        currentShutterSpeed = speed.name // optimistic — camera confirmation follows
         guard let ptpService else { return }
         Task {
             do {
@@ -200,16 +202,20 @@ class CameraManager: NSObject {
 
         // Update available value lists (filter our static table to only camera-supported values)
         if let isoList = events.availableValues[CanonProperty.iso.rawValue], !isoList.isEmpty {
-            availableISOs = isoList.compactMap { code in
-                ISOValue.all.first { $0.code == code }
+            let matched = isoList.compactMap { code in ISOValue.all.first { $0.code == code } }
+            print("[Camera] ISO codes from camera: \(isoList.map { "0x\(String($0, radix: 16))" }.joined(separator: ",")) → matched \(matched.count)/\(isoList.count)")
+            if !matched.isEmpty {
+                availableISOs = matched
+                print("[Camera] Available ISOs: \(availableISOs.map(\.name).joined(separator: ", "))")
             }
-            print("[Camera] Available ISOs: \(availableISOs.map(\.name).joined(separator: ", "))")
         }
         if let tvList = events.availableValues[CanonProperty.shutterSpeed.rawValue], !tvList.isEmpty {
-            availableShutterSpeeds = tvList.compactMap { code in
-                ShutterSpeedValue.all.first { $0.code == code }
+            let matched = tvList.compactMap { code in ShutterSpeedValue.all.first { $0.code == code } }
+            print("[Camera] Tv codes from camera: \(tvList.map { "0x\(String($0, radix: 16))" }.joined(separator: ",")) → matched \(matched.count)/\(tvList.count)")
+            if !matched.isEmpty {
+                availableShutterSpeeds = matched
+                print("[Camera] Available Tv: \(availableShutterSpeeds.map(\.name).joined(separator: ", "))")
             }
-            print("[Camera] Available Tv: \(availableShutterSpeeds.map(\.name).joined(separator: ", "))")
         }
     }
 
