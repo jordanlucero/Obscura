@@ -50,6 +50,7 @@ enum CanonPTPOperation: UInt16, Sendable {
     case remoteReleaseOn      = 0x9128
     case remoteReleaseOff     = 0x9129
     case getViewFinderData    = 0x9153
+    case driveLens            = 0x9155
 }
 
 // MARK: - Canon Property Codes
@@ -105,6 +106,53 @@ struct ISOValue: Identifiable, Hashable, Sendable {
     static func name(for code: UInt32) -> String {
         all.first { $0.code == code }?.name ?? "---"
     }
+}
+
+// MARK: - Focus Step
+
+enum FocusStep: CaseIterable, Sendable {
+    case nearFine
+    case nearMedium
+    case nearCoarse
+    case farFine
+    case farMedium
+    case farCoarse
+
+    /// The UInt32 PTP parameter for DriveLens (0x9155)
+    var parameterValue: UInt32 {
+        switch self {
+        case .nearFine:   0x0001
+        case .nearMedium: 0x0002
+        case .nearCoarse: 0x0003
+        case .farFine:    0x8001
+        case .farMedium:  0x8002
+        case .farCoarse:  0x8003
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .nearFine, .farFine:     "1.circle"
+        case .nearMedium, .farMedium: "2.circle"
+        case .nearCoarse, .farCoarse: "3.circle"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .nearFine:   "Near 1"
+        case .nearMedium: "Near 2"
+        case .nearCoarse: "Near 3"
+        case .farFine:    "Far 1"
+        case .farMedium:  "Far 2"
+        case .farCoarse:  "Far 3"
+        }
+    }
+
+    /// Near steps ordered coarse-to-fine (for left-to-right layout toward center)
+    static var nearSteps: [FocusStep] { [.nearCoarse, .nearMedium, .nearFine] }
+    /// Far steps ordered fine-to-coarse (center outward)
+    static var farSteps: [FocusStep]  { [.farFine, .farMedium, .farCoarse] }
 }
 
 // MARK: - Shutter Speed Values

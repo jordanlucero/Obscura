@@ -95,6 +95,19 @@ class CameraManager: NSObject {
         }
     }
 
+    // MARK: - Focus
+
+    func driveLens(step: FocusStep) {
+        guard let ptpService, isLiveViewActive else { return }
+        Task {
+            do {
+                try await ptpService.driveLens(step: step)
+            } catch {
+                self.errorMessage = "Focus failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
     // MARK: - Live View
 
     func startLiveView() {

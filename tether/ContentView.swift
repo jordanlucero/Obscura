@@ -29,6 +29,7 @@ struct ContentView: View {
                 #endif
 
                 floatingControls
+                    .frame(maxWidth: geometry.size.width - 32)
                     .position(effectivePosition(in: geometry))
                     .gesture(panelDragGesture(in: geometry))
             }
@@ -230,7 +231,7 @@ struct ContentView: View {
     // MARK: - Drag Positioning
 
     private func defaultPosition(in geometry: GeometryProxy) -> CGPoint {
-        CGPoint(x: geometry.size.width / 2, y: geometry.size.height - 100)
+        CGPoint(x: geometry.size.width / 2, y: geometry.size.height - 120)
     }
 
     private func effectivePosition(in geometry: GeometryProxy) -> CGPoint {

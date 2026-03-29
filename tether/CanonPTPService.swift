@@ -148,6 +148,14 @@ class CanonPTPService {
         _ = try await sendCommand(operation: .remoteReleaseOff, parameters: [0x03])
     }
 
+    // MARK: - Focus
+
+    /// Drives the lens focus motor by the given step.
+    /// Only works when live view is active.
+    func driveLens(step: FocusStep) async throws {
+        _ = try await sendCommand(operation: .driveLens, parameters: [step.parameterValue])
+    }
+
     // MARK: - Properties (Canon EOS format)
 
     /// Sets a Canon EOS device property.
