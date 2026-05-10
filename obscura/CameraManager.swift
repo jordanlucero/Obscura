@@ -180,7 +180,7 @@ class CameraManager: NSObject {
             let authorized = await requestControlAuthorizationIfNeeded()
             if !authorized {
                 self.connectionState = .error
-                self.errorMessage = "Tether needs permission to connect to your camera. Please make sure Tether has Files & Folders and Camera permissions in Settings > Privacy & Security."
+                self.errorMessage = "Obscura needs permission to connect to your camera. Please make sure Obscura has Files & Folders and Camera permissions in Settings > Privacy & Security."
                 print("[Camera] Control authorization denied.")
                 return
             }

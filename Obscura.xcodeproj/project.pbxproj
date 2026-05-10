@@ -7,13 +7,13 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		16E477EC2F6E01DF0084F574 /* tether.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = tether.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		16E477EC2F6E01DF0084F574 /* Obscura.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Obscura.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		16E477EE2F6E01DF0084F574 /* tether */ = {
+		16E477EE2F6E01DF0084F574 /* obscura */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = tether;
+			path = obscura;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -32,7 +32,7 @@
 		16E477E32F6E01DF0084F574 = {
 			isa = PBXGroup;
 			children = (
-				16E477EE2F6E01DF0084F574 /* tether */,
+				16E477EE2F6E01DF0084F574 /* obscura */,
 				16E477ED2F6E01DF0084F574 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -40,7 +40,7 @@
 		16E477ED2F6E01DF0084F574 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				16E477EC2F6E01DF0084F574 /* tether.app */,
+				16E477EC2F6E01DF0084F574 /* Obscura.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,9 +48,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		16E477EB2F6E01DF0084F574 /* tether */ = {
+		16E477EB2F6E01DF0084F574 /* Obscura */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 16E477F72F6E01E00084F574 /* Build configuration list for PBXNativeTarget "tether" */;
+			buildConfigurationList = 16E477F72F6E01E00084F574 /* Build configuration list for PBXNativeTarget "Obscura" */;
 			buildPhases = (
 				16E477E82F6E01DF0084F574 /* Sources */,
 				16E477E92F6E01DF0084F574 /* Frameworks */,
@@ -61,13 +61,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				16E477EE2F6E01DF0084F574 /* tether */,
+				16E477EE2F6E01DF0084F574 /* obscura */,
 			);
-			name = tether;
+			name = Obscura;
 			packageProductDependencies = (
 			);
 			productName = tether;
-			productReference = 16E477EC2F6E01DF0084F574 /* tether.app */;
+			productReference = 16E477EC2F6E01DF0084F574 /* Obscura.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -85,7 +85,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 16E477E72F6E01DF0084F574 /* Build configuration list for PBXProject "tether" */;
+			buildConfigurationList = 16E477E72F6E01DF0084F574 /* Build configuration list for PBXProject "Obscura" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -99,7 +99,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				16E477EB2F6E01DF0084F574 /* tether */,
+				16E477EB2F6E01DF0084F574 /* Obscura */,
 			);
 		};
 /* End PBXProject section */
@@ -270,7 +270,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Tether controls your Canon EOS camera over USB.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Obscura controls your Canon EOS camera over USB.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -286,7 +286,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = co.jservices.tether;
+				PRODUCT_BUNDLE_IDENTIFIER = co.jservices.obscura;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -327,7 +327,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Tether controls your Canon EOS camera over USB.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Obscura controls your Canon EOS camera over USB.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -343,7 +343,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = co.jservices.tether;
+				PRODUCT_BUNDLE_IDENTIFIER = co.jservices.obscura;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -362,7 +362,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		16E477E72F6E01DF0084F574 /* Build configuration list for PBXProject "tether" */ = {
+		16E477E72F6E01DF0084F574 /* Build configuration list for PBXProject "Obscura" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				16E477F52F6E01E00084F574 /* Debug */,
@@ -371,7 +371,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		16E477F72F6E01E00084F574 /* Build configuration list for PBXNativeTarget "tether" */ = {
+		16E477F72F6E01E00084F574 /* Build configuration list for PBXNativeTarget "Obscura" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				16E477F82F6E01E00084F574 /* Debug */,

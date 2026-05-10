@@ -25,7 +25,7 @@ struct LiveViewDisplay: View {
                 .aspectRatio(contentMode: .fit)
         } else {
             ContentUnavailableView(
-                "Tether Is Ready",
+                "Obscura Is Ready",
                 systemImage: "camera.badge.ellipsis.fill",
                 description: Text(connectionDescription)
             )
