@@ -1,6 +1,8 @@
 > [!WARNING]
 > Obscura only supports Canon EOS cameras at this time. Obscura is untested against cameras from other manufacturers.
 
+<img width="2153" height="1083" alt="Obscura" src="https://jordanhas.fun/portfolio-images/r4rm-ObscuraBanner-Landscape-HDR.avif" />
+
 Obscura provides fast and free camera tethering over USB.
 
 Built with Swift 6 and SwiftUI.
